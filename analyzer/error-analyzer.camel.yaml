@@ -1,7 +1,7 @@
 - route:
     id: error-log-analyzer
     from:
-      uri: jms:error-logs
+      uri: jms:{{camel.jms.queue.error-logs}}
       steps:
         - log:
             message: "Received ERROR log for analysis"
@@ -27,14 +27,6 @@
             constant: GET
         - to:
             uri: infinispan:events
-            parameters:
-              hosts: "{{infinispan.hosts}}"
-              username: "{{infinispan.username}}"
-              password: "{{infinispan.password}}"
-              saslMechanism: DIGEST-MD5
-              securityRealm: "{{infinispan.security-realm}}"
-              securityServerName: "{{infinispan.security-server-name}}"
-              secure: true
 
         # Check if we have events to analyze
         - choice:

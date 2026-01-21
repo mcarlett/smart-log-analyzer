@@ -29,14 +29,6 @@
                   name: CamelInfinispanOperation
               - to:
                   uri: infinispan:events
-                  parameters:
-                    hosts: "{{infinispan.hosts}}"
-                    password: "{{infinispan.password}}"
-                    saslMechanism: DIGEST-MD5
-                    secure: true
-                    securityRealm: "{{infinispan.security-realm}}"
-                    securityServerName: "{{infinispan.security-server-name}}"
-                    username: "{{infinispan.username}}"
               - choice:
                   otherwise:
                     steps:
@@ -76,19 +68,8 @@
                   name: CamelInfinispanLifespanTimeUnit
               - to:
                   uri: infinispan:events
-                  parameters:
-                    hosts: "{{infinispan.hosts}}"
-                    password: "{{infinispan.password}}"
-                    saslMechanism: DIGEST-MD5
-                    secure: true
-                    securityRealm: "{{infinispan.security-realm}}"
-                    securityServerName: "{{infinispan.security-server-name}}"
-                    username: "{{infinispan.username}}"
               - setBody:
                   simple: ${exchangeProperty.currentRecord}
-              - marshal:
-                  json:
-                    library: Jackson
               - log:
                   id: log-stored
                   message: |-
@@ -100,9 +81,10 @@
                             message: "Sending ERROR log to JMS queue for traceId:
                               ${exchangeProperty.traceId}"
                         - to:
-                            uri: jms:error-logs
+                            uri: jms:{{camel.jms.queue.error-logs}}
                       jq:
                         expression: .severityText == "ERROR"
             expression:
               jsonpath:
                 expression: $[*]
+                writeAsString: true

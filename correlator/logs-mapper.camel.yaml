@@ -1,15 +1,10 @@
 - route:
     id: log-consumer
     from:
-      uri: kafka
+      uri: kafka:{{camel.kafka.topic.logs}}
       parameters:
         autoOffsetReset: earliest
-        brokers: "{{kafka.brokers}}"
         groupId: correlator
-        securityProtocol: SSL
-        sslTruststoreLocation: ./kafka-ca-cert.pem
-        sslTruststoreType: PEM
-        topic: otlp_logs
       steps:
         - log:
             loggingLevel: DEBUG
