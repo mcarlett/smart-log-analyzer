@@ -1,0 +1,76 @@
+- route:
+    id: error-log-analyzer
+    from:
+      uri: jms:error-logs
+      steps:
+        - log:
+            message: "Received ERROR log for analysis"
+            loggingLevel: INFO
+
+        # Extract traceId from the message
+        - setProperty:
+            name: traceId
+            jq:
+              expression: ".traceId"
+              resultType: java.lang.String
+
+        - log:
+            message: "Retrieving all events for traceId: ${exchangeProperty.traceId}"
+            loggingLevel: INFO
+
+        # GET all events for this traceId from Infinispan
+        - setHeader:
+            name: CamelInfinispanKey
+            simple: "otel-${exchangeProperty.traceId}"
+        - setHeader:
+            name: CamelInfinispanOperation
+            constant: GET
+        - to:
+            uri: infinispan:events
+            parameters:
+              hosts: "{{infinispan.hosts}}"
+              username: "{{infinispan.username}}"
+              password: "{{infinispan.password}}"
+              saslMechanism: DIGEST-MD5
+              securityRealm: "{{infinispan.security-realm}}"
+              securityServerName: "{{infinispan.security-server-name}}"
+              secure: true
+
+        # Check if we have events to analyze
+        - choice:
+            when:
+              - simple: "${body} != null && ${body} != ''"
+                steps:
+                  - log:
+                      message: "Sending ${body.length} events to LLM for analysis"
+
+                  # Prepare prompt with context
+                  - setProperty:
+                      name: eventsJson
+                      simple: "${body}"
+
+                  - setBody:
+                      simple: |
+                        Analyze the following OpenTelemetry logs and traces for traceId ${exchangeProperty.traceId}.
+                        Identify the root cause of the error, explain what happened, and suggest possible fixes.
+
+                        Events (sorted by timestamp):
+                        ${exchangeProperty.eventsJson}
+
+                  # Send to LLM for analysis
+                  - to:
+                      uri: openai:chat-completion
+                      parameters:
+                        systemMessage: >
+                          You are an expert DevOps engineer and log analyst.
+                          Analyze OpenTelemetry logs and traces to identify errors, their root causes,
+                          and provide actionable recommendations. Be concise and focus on the error.
+
+                  - log:
+                      message: "LLM Analysis for traceId ${exchangeProperty.traceId}: ${body}"
+
+            otherwise:
+              steps:
+                - log:
+                    message: "No events found in Infinispan for traceId: ${exchangeProperty.traceId}"
+                    loggingLevel: WARN

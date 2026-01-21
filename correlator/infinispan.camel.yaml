@@ -1,0 +1,108 @@
+- route:
+    id: route-1200
+    from:
+      id: from-9847
+      uri: direct
+      parameters:
+        name: store
+      steps:
+        - split:
+            id: split-records
+            steps:
+              - log:
+                  id: log-record
+                  loggingLevel: DEBUG
+                  message: "Processing record: ${body}"
+              - setProperty:
+                  jq:
+                    expression: .traceId
+                    resultType: java.lang.String
+                  name: traceId
+              - setProperty:
+                  name: currentRecord
+                  simple: ${body}
+              - setHeader:
+                  name: CamelInfinispanKey
+                  simple: otel-${exchangeProperty.traceId}
+              - setHeader:
+                  constant: GET
+                  name: CamelInfinispanOperation
+              - to:
+                  uri: infinispan:events
+                  parameters:
+                    hosts: "{{infinispan.hosts}}"
+                    password: "{{infinispan.password}}"
+                    saslMechanism: DIGEST-MD5
+                    secure: true
+                    securityRealm: "{{infinispan.security-realm}}"
+                    securityServerName: "{{infinispan.security-server-name}}"
+                    username: "{{infinispan.username}}"
+              - choice:
+                  otherwise:
+                    steps:
+                      - setBody:
+                          simple: ${exchangeProperty.currentRecord}
+                      - setBody:
+                          jq:
+                            expression: "[.]"
+                            resultType: java.lang.String
+                  when:
+                    - steps:
+                        - setHeader:
+                            name: existingRecords
+                            simple: ${body}
+                        - setBody:
+                            simple: ${exchangeProperty.currentRecord}
+                        - setBody:
+                            jq:
+                              expression: (header("existingRecords") | fromjson) + [.] |
+                                sort_by(.timeUnixNano)
+                              resultType: java.lang.String
+                      simple: ${body} != null && ${body} != ''
+              - setHeader:
+                  name: CamelInfinispanKey
+                  simple: otel-${exchangeProperty.traceId}
+              - setHeader:
+                  name: CamelInfinispanValue
+                  simple: ${body}
+              - setHeader:
+                  constant: PUT
+                  name: CamelInfinispanOperation
+              - setHeader:
+                  constant: "300"
+                  name: CamelInfinispanLifespanTime
+              - setHeader:
+                  constant: SECONDS
+                  name: CamelInfinispanLifespanTimeUnit
+              - to:
+                  uri: infinispan:events
+                  parameters:
+                    hosts: "{{infinispan.hosts}}"
+                    password: "{{infinispan.password}}"
+                    saslMechanism: DIGEST-MD5
+                    secure: true
+                    securityRealm: "{{infinispan.security-realm}}"
+                    securityServerName: "{{infinispan.security-server-name}}"
+                    username: "{{infinispan.username}}"
+              - setBody:
+                  simple: ${exchangeProperty.currentRecord}
+              - marshal:
+                  json:
+                    library: Jackson
+              - log:
+                  id: log-stored
+                  message: |-
+                    Stored record for traceId: ${exchangeProperty.traceId}
+              - choice:
+                  when:
+                    - steps:
+                        - log:
+                            message: "Sending ERROR log to JMS queue for traceId:
+                              ${exchangeProperty.traceId}"
+                        - to:
+                            uri: jms:error-logs
+                      jq:
+                        expression: .severityText == "ERROR"
+            expression:
+              jsonpath:
+                expression: $[*]
