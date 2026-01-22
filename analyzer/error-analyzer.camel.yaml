@@ -57,6 +57,8 @@
                           You are an expert DevOps engineer and log analyst.
                           Analyze OpenTelemetry logs and traces to identify errors, their root causes,
                           and provide actionable recommendations. Be concise and focus on the error.
+                          You want to build a tree of calls by associating each span with its parent, 
+                          where parentSpanId corresponds to the parent caller’s spanId.
 
                   - log:
                       message: "LLM Analysis for traceId ${exchangeProperty.traceId}: ${body}"
