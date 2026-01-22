@@ -1,3 +1,5 @@
+# Stores OpenTelemetry records in Infinispan cache, grouped by traceId
+# and marks ERROR events for deferred processing
 - route:
     id: route-1200
     from:
@@ -13,91 +15,96 @@
                   id: log-record
                   loggingLevel: DEBUG
                   message: "Processing record: ${body}"
-              - setProperty:
+              - setVariable:
                   jq:
                     expression: .traceId
                     resultType: java.lang.String
                   name: traceId
-              - setProperty:
-                  name: currentRecord
-                  simple: ${body}
-              - setHeader:
-                  name: CamelInfinispanKey
-                  simple: otel-${exchangeProperty.traceId}
-              - setHeader:
-                  constant: GET
-                  name: CamelInfinispanOperation
-              - to:
-                  uri: infinispan:events
-              - choice:
-                  otherwise:
-                    steps:
-                      - setBody:
-                          simple: ${exchangeProperty.currentRecord}
-                      - setBody:
-                          jq:
-                            expression: "[.]"
-                            resultType: java.lang.String
-                  when:
-                    - steps:
-                        - setHeader:
-                            name: existingRecords
-                            simple: ${body}
-                        - setBody:
-                            simple: ${exchangeProperty.currentRecord}
-                        - setBody:
+              - filter:
+                  expression:
+                    simple: ${variable.traceId} != null && ${variable.traceId} != ''
+                  steps:
+                    - claimCheck:
+                        key: currentRecord
+                        operation: Set
+                    - setHeader:
+                        name: CamelInfinispanKey
+                        simple: otel-${variable.traceId}
+                    - setHeader:
+                        constant: GET
+                        name: CamelInfinispanOperation
+                    - to:
+                        uri: infinispan:events
+                    - choice:
+                        otherwise:
+                          steps:
+                            - claimCheck:
+                                key: currentRecord
+                                operation: Get
+                            - setBody:
+                                jq:
+                                  expression: "[.]"
+                                  resultType: java.lang.String
+                        when:
+                          - steps:
+                              - setVariable:
+                                  name: existingRecords
+                                  simple: ${body}
+                              - claimCheck:
+                                  key: currentRecord
+                                  operation: Get
+                              - setBody:
+                                  jq:
+                                    expression: (variable("existingRecords") | fromjson) + [.] |
+                                      sort_by(.timeUnixNano)
+                                    resultType: java.lang.String
+                            simple: ${body} != null && ${body} != ''
+                    - setHeader:
+                        name: CamelInfinispanKey
+                        simple: otel-${variable.traceId}
+                    - setHeader:
+                        name: CamelInfinispanValue
+                        simple: ${body}
+                    - setHeader:
+                        constant: PUT
+                        name: CamelInfinispanOperation
+                    - setHeader:
+                        constant: "300"
+                        name: CamelInfinispanLifespanTime
+                    - setHeader:
+                        constant: SECONDS
+                        name: CamelInfinispanLifespanTimeUnit
+                    - to:
+                        uri: infinispan:events
+                    - claimCheck:
+                        key: currentRecord
+                        operation: GetAndRemove
+                    - log:
+                        id: log-stored
+                        message: "Stored record for traceId: ${variable.traceId}"
+                    - choice:
+                        when:
+                          - steps:
+                              - log:
+                                  message: "Adding ERROR log to events-to-process cache for traceId:
+                                    ${variable.traceId}"
+                              - setHeader:
+                                  name: CamelInfinispanKey
+                                  simple: ${variable.traceId}
+                              - setHeader:
+                                  name: CamelInfinispanValue
+                                  simple: ${variable.traceId}
+                              - setHeader:
+                                  constant: PUTIFABSENT
+                                  name: CamelInfinispanOperation
+                              - to:
+                                  uri: infinispan:events-to-process
                             jq:
-                              expression: (header("existingRecords") | fromjson) + [.] |
-                                sort_by(.timeUnixNano)
-                              resultType: java.lang.String
-                      simple: ${body} != null && ${body} != ''
-              - setHeader:
-                  name: CamelInfinispanKey
-                  simple: otel-${exchangeProperty.traceId}
-              - setHeader:
-                  name: CamelInfinispanValue
-                  simple: ${body}
-              - setHeader:
-                  constant: PUT
-                  name: CamelInfinispanOperation
-              - setHeader:
-                  constant: "300"
-                  name: CamelInfinispanLifespanTime
-              - setHeader:
-                  constant: SECONDS
-                  name: CamelInfinispanLifespanTimeUnit
-              - to:
-                  uri: infinispan:events
-              - setBody:
-                  simple: ${exchangeProperty.currentRecord}
-              - log:
-                  id: log-stored
-                  message: |-
-                    Stored record for traceId: ${exchangeProperty.traceId}
-              - choice:
-                  when:
-                    - steps:
-                        - log:
-                            message: "Adding ERROR log to events-to-process cache for traceId:
-                              ${exchangeProperty.traceId}"
-                        - setHeader:
-                            name: CamelInfinispanKey
-                            simple: ${exchangeProperty.traceId}
-                        - setHeader:
-                            name: CamelInfinispanValue
-                            simple: ${exchangeProperty.traceId}
-                        - setHeader:
-                            constant: PUTIFABSENT
-                            name: CamelInfinispanOperation
-                        - to:
-                            uri: infinispan:events-to-process
-                      jq:
-                        expression: .severityText == "ERROR"
+                              expression: .severityText == "ERROR"
             expression:
               jsonpath:
                 expression: $[*]
                 writeAsString: true
-
 - route:
     id: route-expired-events
     from:

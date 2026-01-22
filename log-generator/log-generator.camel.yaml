@@ -1,3 +1,5 @@
+# Simulates order processing with random success/failure outcomes (30% failure rate)
+# to generate realistic log data for testing the error analyzer
 - route:
     id: order-processor
     from:
@@ -8,19 +10,19 @@
       steps:
 
         # Generate random order ID
-        - setHeader:
+        - setVariable:
             name: orderId
             simple: "ORD-${random(10000,99999)}"
 
         # Log: Order received
         - log:
-            message: "Received new order ${header.orderId} from customer ${random(1000,9999)}"
+            message: "Received new order ${variable.orderId} from customer ${random(1000,9999)}"
             loggingLevel: INFO
             logName: com.example.order.OrderService
 
         # Log: Validation
         - log:
-            message: "Validating order ${header.orderId}: checking inventory and pricing"
+            message: "Validating order ${variable.orderId}: checking inventory and pricing"
             loggingLevel: INFO
             logName: com.example.order.ValidationService
 
@@ -35,41 +37,42 @@
                         - simple: "${random(0,100)} < 33"
                           steps:
                             - log:
-                                message: "Connecting to database for order ${header.orderId}"
+                                message: "Connecting to database for order ${variable.orderId}"
                                 loggingLevel: INFO
                                 logName: com.example.order.DatabaseService
                             - throwException:
-                                message: "Database connection failed: Connection refused to postgres:5432 while processing order ${header.orderId}"
+                                message: "Database connection failed: Connection refused to postgres:5432 while processing order ${variable.orderId}"
                                 exceptionType: java.lang.RuntimeException
                         - simple: "${random(0,100)} < 66"
                           steps:
                             - log:
-                                message: "Initiating payment for order ${header.orderId}"
+                                message: "Initiating payment for order ${variable.orderId}"
                                 loggingLevel: INFO
                                 logName: com.example.payment.PaymentGateway
                             - throwException:
-                                message: "Network timeout while connecting to payment gateway api.stripe.com for order ${header.orderId}"
+                                message: "Network timeout while connecting to payment gateway api.stripe.com for order ${variable.orderId}"
                                 exceptionType: java.lang.RuntimeException
                       otherwise:
                         steps:
                           - log:
-                              message: "Verifying user authentication for order ${header.orderId}"
+                              message: "Verifying user authentication for order ${variable.orderId}"
                               loggingLevel: INFO
                               logName: com.example.auth.AuthService
                           - throwException:
-                              message: "Authentication failed: Invalid JWT token signature for order ${header.orderId}"
+                              message: "Authentication failed: Invalid JWT token signature for order ${variable.orderId}"
                               exceptionType: java.lang.RuntimeException
             otherwise:
               steps:
                 - log:
-                    message: "Payment processed successfully for order ${header.orderId}"
+                    message: "Payment processed successfully for order ${variable.orderId}"
                     loggingLevel: INFO
                     logName: com.example.payment.PaymentGateway
                 - log:
-                    message: "Order ${header.orderId} completed successfully"
+                    message: "Order ${variable.orderId} completed successfully"
                     loggingLevel: INFO
                     logName: com.example.order.OrderService
 
+# Periodic health check logging for system monitoring
 - route:
     id: health-checker
     from:
