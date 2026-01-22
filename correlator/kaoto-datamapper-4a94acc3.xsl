@@ -5,37 +5,32 @@
     <xsl:param name="logs"/>
     <xsl:variable name="logs-x" select="json-to-xml($logs)"/>
     <xsl:variable name="mapped-xml">
-        <array xmlns="http://www.w3.org/2005/xpath-functions">
-            <xsl:for-each select="$logs-x/fn:map/fn:array[@key='resourceLogs']/fn:map/fn:array[@key='scopeLogs']/fn:map/fn:array[@key='logRecords']/fn:map">
-                <map>
-                    <string key="type">log</string>
-                    <string key="timeUnixNano">
-                        <xsl:value-of select="fn:string[@key='timeUnixNano']"/>
-                    </string>
-                    <string key="observedTimeUnixNano">
-                        <xsl:value-of select="fn:string[@key='observedTimeUnixNano']"/>
-                    </string>
-                    <string key="severityText">
-                        <xsl:value-of select="fn:string[@key='severityText']"/>
-                    </string>
-                    <string key="message">
-                        <xsl:value-of select="fn:map[@key='body']/fn:string[@key='stringValue']"/>
-                        <xsl:for-each select="fn:array[@key='attributes']/fn:map">
-                            <xsl:text>&#10;</xsl:text>
-                            <xsl:value-of select="fn:string[@key='key']"/>
-                            <xsl:text>: </xsl:text>
-                            <xsl:value-of select="fn:map[@key='value']/fn:string[@key='stringValue']"/>
-                        </xsl:for-each>
-                    </string>
-                    <string key="traceId">
-                        <xsl:value-of select="fn:string[@key='traceId']"/>
-                    </string>
-                    <string key="spanId">
-                        <xsl:value-of select="fn:string[@key='spanId']"/>
-                    </string>
-                </map>
-            </xsl:for-each>
-        </array>
+        <map xmlns="http://www.w3.org/2005/xpath-functions">
+            <string key="timeUnixNano">
+                <xsl:value-of select="$logs-x/fn:map/fn:string[@key='timeUnixNano']"/>
+            </string>
+            <string key="observedTimeUnixNano">
+                <xsl:value-of select="$logs-x/fn:map/fn:string[@key='observedTimeUnixNano']"/>
+            </string>
+            <string key="severityText">
+                <xsl:value-of select="$logs-x/fn:map/fn:string[@key='severityText']"/>
+            </string>
+            <string key="message">
+                <xsl:value-of select="$logs-x/fn:map/fn:map[@key='body']/fn:string[@key='stringValue']"/>
+                <xsl:for-each select="$logs-x/fn:map/fn:array[@key='attributes']/fn:map">
+                    <xsl:value-of select="concat('&#10;', fn:string[@key='key'], ': ', fn:map[@key='value']/fn:string[@key='stringValue'])"/>
+                </xsl:for-each>
+            </string>
+            <string key="traceId">
+                <xsl:value-of select="$logs-x/fn:map/fn:string[@key='traceId']"/>
+            </string>
+            <string key="spanId">
+                <xsl:value-of select="$logs-x/fn:map/fn:string[@key='spanId']"/>
+            </string>
+            <string key="type">
+                <xsl:value-of select="'log'"/>
+            </string>
+        </map>
     </xsl:variable>
     <xsl:template match="/">
         <xsl:value-of select="xml-to-json($mapped-xml)"/>

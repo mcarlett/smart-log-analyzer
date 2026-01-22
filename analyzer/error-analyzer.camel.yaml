@@ -17,11 +17,10 @@
         - setHeader:
             name: CamelInfinispanKey
             simple: otel-${variable.traceId}
-        - setHeader:
-            constant: GET
-            name: CamelInfinispanOperation
         - to:
             uri: infinispan:events
+            parameters:
+              operation: GET
         - choice:
             otherwise:
               steps:

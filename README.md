@@ -10,7 +10,8 @@ sequenceDiagram
     participant OTel as OTEL Collector
     participant Kafka as Kafka
     participant Correlator as Correlator
-    participant Infinispan as Infinispan Cache
+    participant Events as Infinispan (events)
+    participant ToProcess as Infinispan (events-to-process)
     participant JMS as JMS Queue
     participant Analyzer as Analyzer
     participant LLM as Ollama LLM
@@ -21,12 +22,15 @@ sequenceDiagram
     Kafka->>Correlator: Consume spans
     Kafka->>Correlator: Consume logs
     Correlator->>Correlator: Transform via XSLT
-    Correlator->>Infinispan: Store by traceId (TTL: 5min)
+    Correlator->>Events: Store by traceId (TTL: 5min)
 
     alt Error detected (severityText = ERROR)
-        Correlator->>JMS: Send error log to queue
-        JMS->>Analyzer: Consume error log
-        Analyzer->>Infinispan: Fetch all events for traceId
+        Correlator->>ToProcess: Add traceId (TTL: 20s)
+        Note over ToProcess: Wait for related events
+        ToProcess-->>Correlator: Cache entry expired event
+        Correlator->>JMS: Send traceId to queue
+        JMS->>Analyzer: Consume traceId
+        Analyzer->>Events: Fetch all events for traceId
         Analyzer->>LLM: Send events for analysis
         LLM-->>Analyzer: Root cause analysis result
     end
@@ -41,15 +45,19 @@ The correlator is the central event processing component:
 - Consumes OTEL logs from `otlp_logs` Kafka topic
 - Consumes OTEL traces from `otlp_spans` Kafka topic
 - Transforms complex OTEL format to simplified JSON via XSLT
-- Correlates all events by traceId in Infinispan cache
-- Detects ERROR-level logs and routes them to JMS queue for analysis
+- Correlates all events by traceId in Infinispan `events` cache (TTL: 5min)
+- Uses `events-to-process` cache for deferred error analysis:
+  - When an ERROR log is detected, adds the traceId to this cache with a 20s TTL
+  - Listens for cache expiration events to trigger analysis
+  - This delay ensures all related spans and logs are collected before analysis
+- Sends expired traceIds to JMS queue for the Analyzer
 
 ### Analyzer
 
 The analyzer performs intelligent root cause analysis:
 
-- Listens on JMS `error-logs` queue for error events
-- Retrieves full trace context from Infinispan
+- Listens on JMS `error-logs` queue for traceIds from the Correlator
+- Retrieves full trace context from Infinispan `events` cache
 - Sends events to Ollama LLM (granite4:3b) for intelligent analysis
 - Outputs analysis results to logs
 

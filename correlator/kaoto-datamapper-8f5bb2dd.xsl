@@ -5,73 +5,58 @@
     <xsl:param name="traces"/>
     <xsl:variable name="traces-x" select="json-to-xml($traces)"/>
     <xsl:variable name="mapped-xml">
-        <array xmlns="http://www.w3.org/2005/xpath-functions">
-            <xsl:for-each select="$traces-x/fn:map/fn:array[@key='resourceSpans']/fn:map/fn:array[@key='scopeSpans']/fn:map/fn:array[@key='spans']/fn:map">
-                <map>
-                    <string key="type"/>
-                    <string key="timeUnixNano">
-                        <xsl:value-of select="fn:string[@key='startTimeUnixNano']"/>
-                    </string>
-                    <string key="durationNano">
-                        <xsl:value-of select="xs:integer(fn:string[@key='endTimeUnixNano']) - xs:integer(fn:string[@key='startTimeUnixNano'])"/>
-                    </string>
-                    <string key="traceId">
-                        <xsl:value-of select="fn:string[@key='traceId']"/>
-                    </string>
-                    <string key="spanId">
-                        <xsl:value-of select="fn:string[@key='spanId']"/>
-                    </string>
-                    <xsl:if test="fn:string[@key='parentSpanId']">
-                        <string key="parentSpanId">
-                            <xsl:value-of select="fn:string[@key='parentSpanId']"/>
-                        </string>
-                    </xsl:if>
-                    <string key="name">
-                        <xsl:value-of select="fn:string[@key='name']"/>
-                    </string>
-                    <string key="kind">
-                        <xsl:choose>
-                            <xsl:when test="fn:number[@key='kind'] = 1"/>
-                            <xsl:when test="fn:number[@key='kind'] = 2"/>
-                            <xsl:when test="fn:number[@key='kind'] = 3"/>
-                            <xsl:when test="fn:number[@key='kind'] = 4"/>
-                            <xsl:when test="fn:number[@key='kind'] = 5"/>
-                            <xsl:otherwise/>
-                        </xsl:choose>
-                    </string>
-                    <string key="status">
-                        <xsl:choose>
-                            <xsl:when test="fn:map[@key='status']/fn:number[@key='code'] = 1"/>
-                            <xsl:when test="fn:map[@key='status']/fn:number[@key='code'] = 2"/>
-                            <xsl:otherwise/>
-                        </xsl:choose>
-                    </string>
-                    <string key="message">
-                        <xsl:for-each select="fn:array[@key='attributes']/fn:map">
-                            <xsl:value-of select="fn:string[@key='key']"/>
-                            <xsl:choose>
-                                <xsl:when test="fn:map[@key='value']/fn:string[@key='stringValue']">
-                                    <xsl:value-of select="fn:map[@key='value']/fn:string[@key='stringValue']"/>
-                                </xsl:when>
-                                <xsl:when test="fn:map[@key='value']/fn:string[@key='intValue']">
-                                    <xsl:value-of select="fn:map[@key='value']/fn:string[@key='intValue']"/>
-                                </xsl:when>
-                                <xsl:when test="fn:map[@key='value']/fn:number[@key='intValue']">
-                                    <xsl:value-of select="fn:map[@key='value']/fn:number[@key='intValue']"/>
-                                </xsl:when>
-                            </xsl:choose>
-                        </xsl:for-each>
-                        <xsl:for-each select="fn:array[@key='events']/fn:map">
-                            <xsl:value-of select="fn:string[@key='name']"/>
-                            <xsl:for-each select="fn:array[@key='attributes']/fn:map">
-                                <xsl:value-of select="fn:string[@key='key']"/>
-                                <xsl:value-of select="fn:map[@key='value']/fn:string[@key='stringValue']"/>
-                            </xsl:for-each>
-                        </xsl:for-each>
-                    </string>
-                </map>
-            </xsl:for-each>
-        </array>
+        <map xmlns="http://www.w3.org/2005/xpath-functions">
+            <string key="type">
+                <xsl:value-of select="'trace'"/>
+            </string>
+            <string key="timeUnixNano">
+                <xsl:value-of select="$traces-x/fn:map/fn:string[@key='startTimeUnixNano']"/>
+            </string>
+            <string key="durationNano">
+                <xsl:value-of select="xs:integer($traces-x/fn:map/fn:string[@key='endTimeUnixNano']) - xs:integer($traces-x/fn:map/fn:string[@key='startTimeUnixNano'])"/>
+            </string>
+            <string key="traceId">
+                <xsl:value-of select="$traces-x/fn:map/fn:string[@key='traceId']"/>
+            </string>
+            <string key="spanId">
+                <xsl:value-of select="$traces-x/fn:map/fn:string[@key='spanId']"/>
+            </string>
+            <xsl:if test="$traces-x/fn:map/fn:string[@key='parentSpanId']">
+                <string key="parentSpanId">
+                    <xsl:value-of select="$traces-x/fn:map/fn:string[@key='parentSpanId']"/>
+                </string>
+            </xsl:if>
+            <string key="name">
+                <xsl:value-of select="$traces-x/fn:map/fn:string[@key='name']"/>
+            </string>
+            <string key="kind">
+                <xsl:value-of select="$traces-x/fn:map/fn:number[@key='kind']"/>
+            </string>
+            <string key="status">
+                <xsl:value-of select="$traces-x/fn:map/fn:map[@key='status']/fn:number[@key='code']"/>
+            </string>
+            <string key="message">
+                <xsl:for-each select="$traces-x/fn:map/fn:array[@key='attributes']/fn:map">
+                    <xsl:choose>
+                        <xsl:when test="fn:map[@key='value']/fn:string[@key='stringValue']">
+                            <xsl:value-of select="concat('&#10;', fn:string[@key='key'], ': ', fn:map[@key='value']/fn:string[@key='stringValue'])"/>
+                        </xsl:when>
+                        <xsl:when test="fn:map[@key='value']/fn:string[@key='intValue']">
+                            <xsl:value-of select="concat('&#10;', fn:string[@key='key'], ': ', fn:map[@key='value']/fn:string[@key='intValue'])"/>
+                        </xsl:when>
+                        <xsl:when test="fn:map[@key='value']/fn:number[@key='intValue']">
+                            <xsl:value-of select="concat('&#10;', fn:string[@key='key'], ': ', fn:map[@key='value']/fn:number[@key='intValue'])"/>
+                        </xsl:when>
+                    </xsl:choose>
+                </xsl:for-each>
+                <xsl:for-each select="$traces-x/fn:map/fn:array[@key='events']/fn:map">
+                    <xsl:value-of select="concat('&#10;[Event] ', fn:string[@key='name'])"/>
+                    <xsl:for-each select="fn:array[@key='attributes']/fn:map">
+                        <xsl:value-of select="concat('&#10;  ', fn:string[@key='key'], ': ', fn:map[@key='value']/fn:string[@key='stringValue'])"/>
+                    </xsl:for-each>
+                </xsl:for-each>
+            </string>
+        </map>
     </xsl:variable>
     <xsl:template match="/">
         <xsl:value-of select="xml-to-json($mapped-xml)"/>
