@@ -10,9 +10,7 @@
         # Extract traceId from the message
         - setProperty:
             name: traceId
-            jq:
-              expression: ".traceId"
-              resultType: java.lang.String
+            simple: "${body}"
 
         - log:
             message: "Retrieving all events for traceId: ${exchangeProperty.traceId}"

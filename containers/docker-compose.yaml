@@ -52,13 +52,14 @@ services:
     networks:
       - otel-network
     volumes:
-      - ./infinispan-cache-config.json:/etc/infinispan-cache-config.json:ro
+      - ./caches:/etc/caches:ro
     command: >
       sh -c "
         sleep 2 &&
-        echo 'Creating events cache...' &&
-        curl -f -u admin:password --digest -X POST 'http://infinispan:11222/rest/v2/caches/events' -H 'Content-Type: application/json' -d @/etc/infinispan-cache-config.json &&
-        echo 'Cache events created successfully'
+        echo 'Creating caches...' &&
+        curl -f -u admin:password --digest -X POST 'http://infinispan:11222/rest/v2/caches/events' -H 'Content-Type: application/json' -d @/etc/caches/infinispan-events-config.json &&
+        curl -f -u admin:password --digest -X POST 'http://infinispan:11222/rest/v2/caches/events-to-process' -H 'Content-Type: application/json' -d @/etc/caches/infinispan-events-to-process-config.json &&
+        echo 'Caches created successfully'
       "
     deploy:
       restart_policy:
