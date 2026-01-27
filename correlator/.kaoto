@@ -9,7 +9,7 @@
 			"logs": {
 				"type": "JSON Schema",
 				"filePath": [
-					"otel-logs-schema.json"
+					"otel-log-record-schema.json"
 				],
 				"fieldTypeOverrides": []
 			}
@@ -34,7 +34,7 @@
 			"traces": {
 				"type": "JSON Schema",
 				"filePath": [
-					"otel-traces-schema.json"
+					"otel-span-schema.json"
 				],
 				"fieldTypeOverrides": []
 			}
