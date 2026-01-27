@@ -64,4 +64,11 @@
                           to the parent caller’s spanId.
                   - log:
                       message: "LLM Analysis for traceId ${variable.traceId}: ${body}"
+                  - setHeader:
+                      name: traceId
+                      simple: "${variable.traceId}"
+                  - to:
+                      uri: jms:{{camel.jms.queue.analysis-result}}
+                  - log:
+                      message: "Sent analysis result to queue for traceId: ${variable.traceId}"
                 simple: ${body} != null && ${body} != ''

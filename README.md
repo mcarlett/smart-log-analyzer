@@ -15,6 +15,7 @@ sequenceDiagram
     participant JMS as JMS Queue
     participant Analyzer as Analyzer
     participant LLM as Ollama LLM
+    participant UIConsole as UI Console
 
     App->>OTel: Send traces & logs (OTLP)
     OTel->>Kafka: Export to otlp_spans & otlp_logs topics
@@ -33,6 +34,9 @@ sequenceDiagram
         Analyzer->>Events: Fetch all events for traceId
         Analyzer->>LLM: Send events for analysis
         LLM-->>Analyzer: Root cause analysis result
+        Analyzer->>JMS: Send analysis result
+        JMS->>UIConsole: Consume analysis result
+        UIConsole->>UIConsole: Save and display result
     end
 ```
 
@@ -85,6 +89,15 @@ A synthetic log generator for demonstration purposes that shows how to add OpenT
 
 Run with the javaagent flag pointing to the agent jar and its configuration file. With this setup, Camel will automatically expose custom traces for route executions and exchanges.
 
+### UI Console
+
+The UI Console provides visualization and storage for analysis results:
+
+- Listens on JMS queue for analysis results from the Analyzer
+- Stores analysis results to files for persistence
+- Exposes REST API to display and access the results
+- Provides a user interface to view root cause analysis
+
 ## Prerequisites
 
 - Docker & Docker Compose
@@ -130,6 +143,15 @@ jbang --javaagent=./opentelemetry-javaagent.jar \
   -Dotel.javaagent.configuration-file=./agent.properties \
   -Dcamel.jbang.version=4.17.0 \
   camel@apache/camel run log-generator.camel.yaml
+```
+
+### 5. Start UI Console
+
+```bash
+cd ui-console
+jbang -Dcamel.jbang.version=4.17.0 camel@apache/camel run \
+  jms-file-storage.camel.yaml \
+  rest-api.camel.yaml
 ```
 
 ## Infrastructure Services
